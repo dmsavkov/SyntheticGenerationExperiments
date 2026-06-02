@@ -1,0 +1,48 @@
+# --- Generated experiment artifacts ---
+/runs/
+/results/
+/cache/
+/checkpoints/
+/archive/
+mlruns/
+
+# --- Regenerated analysis outputs (scripts + leaderboard stay tracked) ---
+/analysis/reports/
+/analysis/plots/
+
+# --- Secrets & local env ---
+.env
+.env.*
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+*.egg-info/
+dist/
+build/
+
+# --- Notebooks ---
+.ipynb_checkpoints/
+
+# --- Large / derived datasets (split manifests under data/splits/ are tracked) ---
+*.parquet
+*.feather
+*.pkl
+*.joblib
+
+# --- OS / editor noise ---
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# --- Model / embedding caches (HF, torch, etc.) ---
+.huggingface/
+transformers_cache/

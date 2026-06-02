@@ -1,0 +1,25 @@
+---
+alwaysApply: true
+description: USE WHEN working on any part of this project
+---
+
+**Tech Stack & Tooling (STRICT)**
+
+- Python 3.13.5
+- uv for package management
+- pyproject.toml for all dependencies and project configuration
+- Testing: pytest (if testing is required)
+- Validation: pydantic (whenever working with models which accept json output)
+- Logging: loguru (every major step should be logged)
+- Core libraries: setfit, umap, sklearn, transformers<5.0 (required for setfit)
+- Environment: dotenv for loading .env files whenever any token is used
+- For C++ tasks: use WSL with g++ (and only for them)
+- Fastembed + sentence-transformers/all-MiniLM-L6-v2 - primary embedding setup.
+
+**Models (STRICT)**
+
+**Google:**
+
+- Utilize genai client (default).
+- gemini-3.1-flash-lite → smart tier (default). Has system prompt support and strong JSON behavior.
+- gemma-4-31b-it → open-weight executor / high-throughput tier (may emit thought parts; parse JSON from text output; supports system prompt).
