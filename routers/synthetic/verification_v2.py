@@ -87,7 +87,7 @@ def filter_verification_v2(
         "n_accepted": len(accepted),
         "n_rejected": len(rejected),
         "sim_threshold": sim_threshold,
-        "prob_band": [uncertainty_low, uncertainty_high],
+        "verification_prob_band": [uncertainty_low, uncertainty_high],
     }
     logger.info(
         "Verification v2: {}/{} accepted (rejected={})",

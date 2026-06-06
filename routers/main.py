@@ -34,6 +34,23 @@ EXPERIMENTS = {
     "setfit08": "routers.experiments.setfit.setfit08_gemma_synth",
     "setfit09": "routers.experiments.setfit.setfit09_opentdb_low_conf",
     "setfit10": "routers.experiments.setfit.setfit10_acceptance_band",
+    "ensemble01": "routers.experiments.ensemble.ensemble01_baseline",
+    "ensemble02": "routers.experiments.ensemble.ensemble02_expert_ovr",
+    "ensemble03": "routers.experiments.ensemble.ensemble03_all_ovr",
+    "combination01": "routers.experiments.combination.combination01_baseline",
+    "combination02": "routers.experiments.combination.combination02_hard_negative",
+    "combination03": "routers.experiments.combination.combination03_cascading",
+    "combination04": "routers.experiments.combination.combination04_failure_synth",
+    "combination05": "routers.experiments.combination.combination05_binary_cascade",
+    "smart01": "routers.experiments.smart.smart01_contrastive_pipeline",
+    "smart02": "routers.experiments.smart.smart02_hard_negative_binary",
+    "smart03": "routers.experiments.smart.smart03_mislabel_lowconf_hardneg",
+    "smart04": "routers.experiments.smart.smart04_cv_hard_negative",
+    "smart05": "routers.experiments.smart.smart05_hard_negative_skip",
+    "smart06": "routers.experiments.smart.smart06_parallel_judge",
+    "smart07": "routers.experiments.smart.smart07_diversity_judge",
+    "smart08": "routers.experiments.smart.smart08_dataset_expansion",
+    "smart09": "routers.experiments.smart.smart09_iterative_hardneg",
 }
 
 

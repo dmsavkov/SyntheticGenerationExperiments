@@ -45,7 +45,7 @@ All runs below completed locally; aggregated metrics live in [`analysis/leaderbo
 | **setfit07** | ✅ | 0.569 / 0.573 | +0.010 |
 | **setfit08** | ✅ | 0.556 / 0.563 | +0.004 (Gemini flash-lite) |
 | **setfit09** | ✅ | **0.634 / 0.578**† | **+0.042** (OpenTDB-only pool) |
-| **setfit10** | ✅ | 0.546 / 0.549 | −0.020 (acceptance band 0.4–0.6) |
+| **setfit10** | ✅ | 0.546 / 0.549 | −0.020 (verification v2, band 0.4–0.6; re-run after fix) |
 
 † setfit09 primary eval on OpenTDB-filtered subset (n=281).
 

@@ -51,7 +51,12 @@ def _record_batch(
     batches: list[dict] = stats.setdefault("generation_batches", [])
     parsed_items = None
     if chat.parsed is not None and hasattr(chat.parsed, "items"):
-        parsed_items = [_llm_item_dict(it) for it in chat.parsed.items]
+        items = chat.parsed.items
+        if items:
+            if isinstance(items[0], dict):
+                parsed_items = list(items)
+            else:
+                parsed_items = [_llm_item_dict(it) for it in items]
     record: dict[str, Any] = {
         "mode": mode,
         "success": chat.parsed is not None,
@@ -81,8 +86,16 @@ def _items_from_batch(
         if stats is not None:
             stats["skipped_batches"] = int(stats.get("skipped_batches", 0)) + 1
         return []
+    items = batch_out.items
+    if not items:
+        return []
+    refs = list(batch)
+    if not refs:
+        refs = [{}]
+    if len(refs) < len(items):
+        refs = refs + [refs[-1]] * (len(items) - len(refs))
     rows: list[dict] = []
-    for item, ex in zip(batch_out.items, batch):
+    for item, ex in zip(items, refs):
         sid = f"synth_{uuid.uuid4().hex[:12]}"
         llm_generated = _llm_item_dict(item)
         row = synthetic_item_to_train_row(item, sid)

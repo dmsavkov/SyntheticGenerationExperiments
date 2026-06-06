@@ -34,6 +34,20 @@ class SyntheticBatch(BaseModel):
     items: list[SyntheticItem]
 
 
+def normalize_synthetic_item_raw(item: Any) -> dict[str, Any]:
+    """Map common LLM aliases (e.g. gold_domain) to SyntheticItem.domain."""
+    if not isinstance(item, dict):
+        raise TypeError(f"Expected dict item, got {type(item)!r}")
+    raw = dict(item)
+    if not str(raw.get("domain", "")).strip():
+        for key in ("gold_domain", "gold", "label", "target_domain"):
+            val = raw.get(key)
+            if val is not None and str(val).strip():
+                raw["domain"] = str(val).strip()
+                break
+    return raw
+
+
 class ValidationItem(BaseModel):
     id: str
     verdict: str
@@ -85,6 +99,7 @@ def parse_synthetic_batch(text: str, *, n_expected: int, domain_labels: list[str
         items_raw = raw
     else:
         raise ValueError(f"Unexpected JSON shape: {type(raw)}")
+    items_raw = [normalize_synthetic_item_raw(it) for it in items_raw]
     batch = SyntheticBatch.model_validate({"items": items_raw})
     if len(batch.items) != n_expected:
         raise ValueError(f"Expected {n_expected} items, got {len(batch.items)}")

@@ -49,7 +49,7 @@ Results: `results/setfit/<experiment>/<timestamp>/`
 | setfit07 | hard + diverse rewrite (15+15 refs) |
 | setfit08 | uncertainty synth via **Google GenAI gemini-3.1-flash-lite** |
 | setfit09 | **OpenTDB-only** pool, bottom 10% confidence correct refs |
-| setfit10 | uncertainty synth, acceptance band **[0.4, 0.6]** |
+| setfit10 | Like setfit05 (verification v2), but reference + verification prob band **[0.4, 0.6]** |
 
 Protocol: 100 real + up to 30 **appended** synthetics; max **3 items per LLM request**; holdout_500 pre/post; primary eval eval_1000.
 
@@ -58,6 +58,51 @@ OpenTDB splits: `data/splits/opentdb_setfit_seed42.json` — rebuild via `python
 Google smoke: `python routers/scripts/smoke_google_genai.py` (requires `GOOGLE_API_KEY` or `GEMINI_API_KEY`).
 
 Colab runner: `notebooks/colab_setfit_experiments.ipynb`
+
+## Ensemble / combination (OpenTDB, Gemini 3.1 flash-lite)
+
+Results: `results/ensemble/` and `results/combination/`
+
+Splits: `data/splits/opentdb_ensemble_seed42.json` (100/100/rest) and `data/splits/opentdb_combination_binary_seed42.json` (20/80/rest, CS vs Technology)
+
+| ID | Description |
+|----|-------------|
+| ensemble01 / combination01 | Multiclass SetFit baseline (no synth) |
+| ensemble02 | General + ≤2 OVR experts (min support **8**), 2 mutation iters; expert override if max expert P≥**0.85** else general |
+| ensemble03 | Full OVR panel; **confused** if ≥2 classes scream P≥**0.85**; pred = argmax OVR prob |
+| combination02 | Hard-negative pair synth (2 per holdout failure) |
+| combination03 | 3-iter cascading chat; eval iter1+2+3 and iter2+3 |
+| combination04 | Failure-driven label_failure synth |
+| combination05 | Binary CS vs Technology cascade (20 train, 80 holdout); Gemini thinking **high** |
+
+Confused routing: mark `confused` when **≥2 distinct labels** have prob ≥ **0.85** (general and/or experts). Ensemble02 final pred: expert class if max expert P≥0.85, else general pred. Also report `metrics_excluding_confused`.
+
+```bash
+python routers/scripts/build_splits.py
+python routers/main.py ensemble01
+```
+
+## Smart experiments (OpenTDB, Gemini; topic `smart`)
+
+Results: `results/smart/<experiment>/<timestamp>/`
+
+Shared protocol: `HARD_NEGATIVE_FEWSHOT` (same as combination02), thinking **high** except smart06/07 (**no reasoning**, temp=1, top_p=0.95). Reference buckets use **bottom/top 10%** `p_gold` among correct (setfit04-style), not absolute thresholds. Async LLM: max **15** in flight, **25** parse retries.
+
+| ID | Description |
+|----|-------------|
+| smart01 | Contrastive 3-step: draft → 5-bullet critique → refine |
+| smart02 | Binary CS vs Technology hard-negative pairs |
+| smart03 | Mislabeled + bottom-percentile correct → hard negatives |
+| smart04 | 5-fold CV on train_100 for failures; **no holdout**; train 100+synth |
+| smart05 | SKIP ambiguous gold else hard-negative pair |
+| smart06 | Per mislabeled ref: 3× parallel pair gen → 1 pair judge → **2 items** (like comb02 volume) |
+| smart07 | Per ref in pool: diversity paths A/B/C → judge picks **1** |
+| smart08 | Top/bottom/mislabeled buckets → **hard-negative pair (2 items) per ref** |
+| smart09 | **3-iter** smart03 cycle: score holdout → synth → retrain; **holdout+test metrics each iter** |
+
+```bash
+python routers/main.py smart02
+```
 
 ## Playground (manual lab)
 

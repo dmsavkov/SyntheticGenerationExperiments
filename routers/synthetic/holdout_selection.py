@@ -18,6 +18,11 @@ SelectionMode = Literal[
 ]
 
 
+def selection_uses_reference_prob_band(mode: SelectionMode) -> bool:
+    """True when reference picking filters holdout rows by p(gold) band."""
+    return mode in ("uncertainty", "rewrite_split")
+
+
 def score_holdout_rows(holdout_rows: list[dict], probe: Any) -> list[dict]:
     scored: list[dict] = []
     for row in holdout_rows:
@@ -120,9 +125,10 @@ def select_holdout_references(
         "selection_mode": mode,
         "n_holdout_scored": len(scored_rows),
         "n_candidates": len(unique),
-        "uncertainty_band": [uncertainty_low, uncertainty_high],
         **cycle_stats,
     }
+    if selection_uses_reference_prob_band(mode):
+        stats["reference_prob_band"] = [uncertainty_low, uncertainty_high]
     logger.info(
         "Selection {}: {} unique → {} slots (cycling={})",
         mode,

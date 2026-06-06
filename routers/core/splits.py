@@ -13,6 +13,11 @@ import pandas as pd
 from loguru import logger
 
 from routers.core.data import SHUFFLE_SEED, load_arena
+from routers.core.constants import (
+    COMBINATION_BINARY_HOLDOUT_N,
+    COMBINATION_BINARY_LABELS,
+    COMBINATION_BINARY_TRAIN_PER_CLASS,
+)
 
 SEED = SHUFFLE_SEED
 
@@ -96,8 +101,36 @@ class OpenTdbSetfitSplits:
     donor_pool_ids: list[Any]
 
 
+@dataclass
+class OpenTdbEnsembleSplits:
+    """OpenTDB ensemble/combination: train_100, holdout_100, test = remainder."""
+
+    train_100_ids: list[Any]
+    holdout_100_ids: list[Any]
+    test_ids: list[Any]
+    label_universe: list[str]
+
+
+@dataclass
+class OpenTdbCombinationBinarySplits:
+    """OpenTDB CS vs Technology: 20 train (10/class), 80 holdout, rest test."""
+
+    train_20_ids: list[Any]
+    holdout_80_ids: list[Any]
+    test_ids: list[Any]
+    label_universe: list[str]
+
+
 def opentdb_setfit_splits_path() -> Path:
     return project_root() / "data" / "splits" / "opentdb_setfit_seed42.json"
+
+
+def opentdb_ensemble_splits_path() -> Path:
+    return project_root() / "data" / "splits" / "opentdb_ensemble_seed42.json"
+
+
+def opentdb_combination_binary_splits_path() -> Path:
+    return project_root() / "data" / "splits" / "opentdb_combination_binary_seed42.json"
 
 
 def _is_opentdb_id(rid: Any) -> bool:
@@ -331,4 +364,170 @@ def get_opentdb_setfit_splits(
         holdout_500_ids=payload["holdout_500_ids"],
         eval_ids=payload["eval_ids"],
         donor_pool_ids=payload.get("donor_pool_ids", []),
+    )
+
+
+def _labels_for_ids(
+    df: pd.DataFrame,
+    ids: list[Any],
+    id_to_idx: dict[Any, int],
+    col: str = "Domain",
+) -> list[str]:
+    labels: set[str] = set()
+    for rid in ids:
+        labels.add(str(df.iloc[id_to_idx[rid]][col]))
+    return sorted(labels)
+
+
+def build_opentdb_ensemble_splits(
+    df: pd.DataFrame,
+    bundle: SplitBundle,
+) -> dict[str, Any]:
+    """100 train + 100 holdout from OTD pool; test = all other OTD ids."""
+    id_to_idx = bundle.id_to_idx
+    otd_train_pool = [i for i in bundle.train_pool_ids if _is_opentdb_id(i)]
+    otd_eval_pool = [i for i in bundle.eval_1000_ids if _is_opentdb_id(i)]
+    all_otd = list(dict.fromkeys(otd_train_pool + otd_eval_pool))
+
+    train_100 = _stratified_ids(df, otd_train_pool, 100, "Domain", SEED + 70, id_to_idx)
+    used = set(train_100)
+    pool2 = [i for i in otd_train_pool if i not in used]
+    holdout_100 = _stratified_ids(df, pool2, 100, "Domain", SEED + 71, id_to_idx)
+    used |= set(holdout_100)
+    test_ids = [i for i in all_otd if i not in used]
+
+    label_universe = _labels_for_ids(
+        df, train_100 + holdout_100 + test_ids, id_to_idx
+    )
+    logger.info(
+        "OpenTDB ensemble splits: train={}, holdout={}, test={}, labels={}",
+        len(train_100),
+        len(holdout_100),
+        len(test_ids),
+        len(label_universe),
+    )
+    return {
+        "seed": SEED,
+        "train_100_ids": train_100,
+        "holdout_100_ids": holdout_100,
+        "test_ids": test_ids,
+        "label_universe": label_universe,
+    }
+
+
+def get_opentdb_ensemble_splits(
+    df: pd.DataFrame | None = None,
+    bundle: SplitBundle | None = None,
+    *,
+    rebuild: bool = False,
+) -> OpenTdbEnsembleSplits:
+    path = opentdb_ensemble_splits_path()
+    if bundle is None:
+        bundle = get_splits(df, rebuild=rebuild)
+    if df is None:
+        df = load_arena()
+
+    if path.exists() and not rebuild:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    else:
+        payload = build_opentdb_ensemble_splits(df, bundle)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
+        logger.info("Wrote OpenTDB ensemble splits to {}", path)
+
+    return OpenTdbEnsembleSplits(
+        train_100_ids=payload["train_100_ids"],
+        holdout_100_ids=payload["holdout_100_ids"],
+        test_ids=payload["test_ids"],
+        label_universe=payload.get("label_universe", []),
+    )
+
+
+def _opentdb_ids_for_labels(
+    df: pd.DataFrame,
+    bundle: SplitBundle,
+    labels: tuple[str, ...] | list[str],
+) -> list[Any]:
+    """OpenTDB rows whose Domain is in labels."""
+    id_to_idx = bundle.id_to_idx
+    label_set = set(labels)
+    pool = [i for i in bundle.train_pool_ids + bundle.eval_1000_ids if _is_opentdb_id(i)]
+    return [
+        rid
+        for rid in pool
+        if str(df.iloc[id_to_idx[rid]]["Domain"]) in label_set
+    ]
+
+
+def build_opentdb_combination_binary_splits(
+    df: pd.DataFrame,
+    bundle: SplitBundle,
+) -> dict[str, Any]:
+    """20 train (10/class) + 80 holdout from CS/Technology OTD pool; test = remainder."""
+    labels = tuple(COMBINATION_BINARY_LABELS)
+    id_to_idx = bundle.id_to_idx
+    otd_pool = _opentdb_ids_for_labels(df, bundle, labels)
+
+    by_label: dict[str, list[Any]] = {lab: [] for lab in labels}
+    for rid in otd_pool:
+        lab = str(df.iloc[id_to_idx[rid]]["Domain"])
+        by_label[lab].append(rid)
+
+    rng = random.Random(SEED + 80)
+    train_20: list[Any] = []
+    for lab in labels:
+        ids = by_label.get(lab, [])
+        take = min(COMBINATION_BINARY_TRAIN_PER_CLASS, len(ids))
+        if take:
+            train_20.extend(rng.sample(ids, take))
+
+    used = set(train_20)
+    pool2 = [i for i in otd_pool if i not in used]
+    holdout_80 = _stratified_ids(
+        df, pool2, COMBINATION_BINARY_HOLDOUT_N, "Domain", SEED + 81, id_to_idx
+    )
+    used |= set(holdout_80)
+    test_ids = [i for i in otd_pool if i not in used]
+
+    logger.info(
+        "OpenTDB binary combination splits: train={}, holdout={}, test={}, labels={}",
+        len(train_20),
+        len(holdout_80),
+        len(test_ids),
+        len(labels),
+    )
+    return {
+        "seed": SEED,
+        "train_20_ids": train_20,
+        "holdout_80_ids": holdout_80,
+        "test_ids": test_ids,
+        "label_universe": list(labels),
+    }
+
+
+def get_opentdb_combination_binary_splits(
+    df: pd.DataFrame | None = None,
+    bundle: SplitBundle | None = None,
+    *,
+    rebuild: bool = False,
+) -> OpenTdbCombinationBinarySplits:
+    path = opentdb_combination_binary_splits_path()
+    if bundle is None:
+        bundle = get_splits(df, rebuild=rebuild)
+    if df is None:
+        df = load_arena()
+
+    if path.exists() and not rebuild:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    else:
+        payload = build_opentdb_combination_binary_splits(df, bundle)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
+        logger.info("Wrote OpenTDB binary combination splits to {}", path)
+
+    return OpenTdbCombinationBinarySplits(
+        train_20_ids=payload["train_20_ids"],
+        holdout_80_ids=payload["holdout_80_ids"],
+        test_ids=payload["test_ids"],
+        label_universe=payload.get("label_universe", list(COMBINATION_BINARY_LABELS)),
     )

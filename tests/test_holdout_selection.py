@@ -22,7 +22,7 @@ def test_uncertainty_band_selection():
     rows = [_scored(0.1), _scored(0.5), _scored(0.9), _scored(0.4, gold="4 Language")]
     pool, stats = select_holdout_references(rows, mode="uncertainty", cap=4, seed=42)
     assert stats["n_ref_slots"] == 4
-    assert stats["uncertainty_band"] == [0.2, 0.8]
+    assert stats["reference_prob_band"] == [0.2, 0.8]
     assert all(0.2 <= r["p_gold"] <= 0.8 for r in pool if "p_gold" in r)
 
 
@@ -36,8 +36,15 @@ def test_narrow_acceptance_band():
         uncertainty_low=0.4,
         uncertainty_high=0.6,
     )
-    assert stats["uncertainty_band"] == [0.4, 0.6]
+    assert stats["reference_prob_band"] == [0.4, 0.6]
     assert all(0.4 <= r["p_gold"] <= 0.6 for r in pool if "p_gold" in r)
+
+
+def test_low_conf_omits_reference_prob_band():
+    rows = [_scored(0.95 - i * 0.01, correct=True) for i in range(20)]
+    _, stats = select_holdout_references(rows, mode="low_conf_correct", cap=5, seed=1)
+    assert "reference_prob_band" not in stats
+    assert "uncertainty_band" not in stats
 
 
 def test_high_conf_top_fraction():

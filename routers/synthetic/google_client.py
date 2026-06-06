@@ -57,6 +57,8 @@ def chat_json(
     max_retries: int = PARSE_MAX_RETRIES,
     model: str | None = None,
     skip_on_failure: bool = False,
+    thinking_level: str | None = None,
+    top_p: float | None = None,
 ) -> ChatResult:
     client = _client()
     model_name = model or google_model()
@@ -75,8 +77,21 @@ def chat_json(
                 ],
                 "temperature": temperature,
             }
+            if top_p is not None:
+                kwargs["top_p"] = top_p
             if "gemini" in model_name.lower():
                 kwargs["response_format"] = {"type": "json_object"}
+            if thinking_level and "gemini" in model_name.lower():
+                # OpenAI-compat endpoint maps reasoning_effort → Gemini thinking budget.
+                effort_map = {
+                    "minimal": "low",
+                    "low": "low",
+                    "medium": "medium",
+                    "high": "high",
+                }
+                kwargs["reasoning_effort"] = effort_map.get(
+                    thinking_level.lower(), thinking_level
+                )
             resp = client.chat.completions.create(**kwargs)
             last_text = (resp.choices[0].message.content or "").strip()
             parsed = parse_fn(_extract_json_text(last_text))

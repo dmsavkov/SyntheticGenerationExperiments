@@ -27,7 +27,12 @@ from routers.experiments._common import (
 )
 from routers.experiments.session import ExperimentSession
 from routers.synthetic.generator_setfit import GenerationMode, generate_from_references
-from routers.synthetic.holdout_selection import SelectionMode, score_holdout_rows, select_holdout_references
+from routers.synthetic.holdout_selection import (
+    SelectionMode,
+    score_holdout_rows,
+    select_holdout_references,
+    selection_uses_reference_prob_band,
+)
 from routers.synthetic.llm_client import LlmBackend
 from routers.synthetic.ollama_client import ollama_model
 from routers.synthetic.verification_v2 import filter_verification_v2
@@ -106,20 +111,24 @@ def run_setfit_experiment(
     u_low, u_high = uncertainty_band or (SETFIT_UNCERTAINTY_LOW, SETFIT_UNCERTAINTY_HIGH)
     df, bundle, ds = load_setfit_context(rebuild_splits=rebuild_splits, split_variant=split_variant)
     labels = label_vocab(df, "Domain")
+    extra: dict[str, Any] = {
+        "training_mode": "real_plus_synthetic" if generate_synthetics else "real_only",
+        "selection_mode": selection_mode,
+        "generation_mode": generation_mode if generate_synthetics else None,
+        "verification_v2": verification_v2,
+        "llm_backend": llm_backend if generate_synthetics else None,
+        "generation_model": generation_model
+        or (GOOGLE_FLASH_MODEL_DEFAULT if llm_backend == "google" else ollama_model()),
+        "split_variant": split_variant,
+    }
+    if generate_synthetics and selection_mode and selection_uses_reference_prob_band(selection_mode):
+        extra["reference_prob_band"] = [u_low, u_high]
+    if generate_synthetics and verification_v2:
+        extra["verification_prob_band"] = [u_low, u_high]
     cfg = setfit_base_config(
         experiment=experiment,
         hypotheses=hypotheses,
-        extra={
-            "training_mode": "real_plus_synthetic" if generate_synthetics else "real_only",
-            "selection_mode": selection_mode,
-            "generation_mode": generation_mode if generate_synthetics else None,
-            "verification_v2": verification_v2,
-            "llm_backend": llm_backend if generate_synthetics else None,
-            "generation_model": generation_model
-            or (GOOGLE_FLASH_MODEL_DEFAULT if llm_backend == "google" else ollama_model()),
-            "uncertainty_band": [u_low, u_high],
-            "split_variant": split_variant,
-        },
+        extra=extra,
     )
     session = ExperimentSession(experiment, topic=SETFIT_TOPIC)
 
